@@ -1,0 +1,181 @@
+from rich import print as rich_print
+from rich.panel import Panel
+
+from core.save import save_game
+from core.colors import MATERIAL_COLORS
+from data.depots import depots
+from data.droppers import droppers
+from data.upgraders import upgraders
+from data.collectors import collectors
+from data.machines import machines
+from data.generators import generators
+from data.materials import materials
+from core.power import format_resource, format_money
+
+
+
+def shop_menu(data):
+    while True:
+        rich_print("\n[bold cyan]=== SHOP ===[/bold cyan]")
+        print("1. Depots")
+        print("2. Droppers")
+        print("3. Upgraders")
+        print("4. Collectors")
+        print("5. Special Machines")
+        print("6. Generators")
+        print("7. Back")
+
+        choice = input("Choisis une catégorie : ")
+
+        if choice == "1":
+            shop_category(data, depots, "Depot")
+        elif choice == "2":
+            shop_category(data, droppers, "Dropper")
+        elif choice == "3":
+            shop_category(data, upgraders, "Upgrader")
+        elif choice == "4":
+            shop_category(data, collectors, "Collector")
+        elif choice == "5":
+            shop_category(data, machines, "Special Machine")
+        elif choice == "6":
+            shop_category(data, generators, "Generator")
+        elif choice == "7":
+            break
+        else:
+            rich_print("[red]❌ Option invalide.[/red]")
+
+
+def shop_category(data, category_dict, category_name):
+    rich_print(f"\n[bold cyan]=== {category_name} Shop ===[/bold cyan]")
+
+    keys = list(category_dict.keys())
+
+    for i, key in enumerate(keys, 1):
+        item = category_dict[key]
+        rich_print(f"{i}. {item.colored_name()}")
+
+    print(f"{len(keys)+1}. Back")
+
+    try:
+        choice = int(input("Choisis un item : "))
+    except:
+        rich_print("[red]❌ Choix invalide.[/red]")
+        return
+
+    if choice == len(keys) + 1:
+        return
+
+    if choice < 1 or choice > len(keys):
+        rich_print("[red]❌ Choix invalide.[/red]")
+        return
+
+    selected_key = keys[choice - 1]
+    item = category_dict[selected_key]
+
+    show_preview(data, item)
+
+
+def show_preview(data, item):
+    text = ""
+
+    if hasattr(item, "tier"):
+        text += f"Tier : {item.tier}\n"
+
+    if hasattr(item, "base_value"):
+        text += f"Base Value : {item.base_value}$\n"
+
+    if hasattr(item, "value"):
+        text += f"Upgrade Value : {item.value}\n"
+
+    if hasattr(item, "multiplier"):
+        text += f"Multiplier : x{item.multiplier}\n"
+
+    if hasattr(item, "power_required"):
+        text += f"Power Required : {item.power_required}u\n"
+
+    if hasattr(item, "drop_time"):
+        text += f"Drop Time : {item.drop_time}s\n"
+
+    text += "\n"
+
+    if hasattr(item, "cost_money"):
+        text += f"Cost Money : {format_money(item.cost_money)}\n"
+
+
+    if hasattr(item, "cost_materials") and item.cost_materials:
+        text += "Cost Materials :\n"
+        for mat_key, amt in item.cost_materials.items():
+            mat = materials[mat_key]
+            owned = data["inventory"].get(mat_key, 0)
+
+            # symbole entre crochets + nom coloré
+            colored_symbol = f"[{mat.color}][{mat.symbol}][/{mat.color}]"
+            colored_name = f"[{mat.color}]{mat.name}[/{mat.color}]"
+
+            text += (
+                f"  {colored_symbol} {colored_name} : "
+                f"{format_resource(owned)} / {format_resource(amt)}\n"
+            )
+
+    text += "\n"
+
+    if hasattr(item, "description"):
+        text += f"Description : {item.description}\n"
+
+    panel = Panel(
+        text,
+        title=item.colored_name(),
+        border_style="cyan",
+        expand=False
+    )
+
+    rich_print(panel)
+
+    buy = input("Acheter ? (y/n) : ").lower()
+
+    if buy == "y":
+        buy_item(data, item)
+
+
+def buy_item(data, item):
+
+    if data["inventory"]["money"] < item.cost_money:
+        rich_print("[red]❌ Pas assez d'argent.[/red]")
+        return
+
+    for mat_key, needed in item.cost_materials.items():
+        if data["inventory"].get(mat_key, 0) < needed:
+            rich_print(f"[red]❌ Pas assez de {mat_key}[/red]")
+            return
+
+    data["inventory"]["money"] -= item.cost_money
+    for mat_key, needed in item.cost_materials.items():
+        data["inventory"][mat_key] -= needed
+
+    added = False
+
+    for category in data["machines"]:
+        if item.key in data["machines"][category]:
+            data["machines"][category][item.key] += 1
+            added = True
+            break
+
+    if not added:
+        if item.key in droppers:
+            data["machines"]["droppers"][item.key] = 1
+        elif item.key in upgraders:
+            data["machines"]["upgraders"][item.key] = 1
+        elif item.key in collectors:
+            data["machines"]["collectors"][item.key] = 1
+        elif item.key in depots:
+            data["machines"]["depots"][item.key] = 1
+        elif item.key in machines:
+            data["machines"]["special"][item.key] = 1
+        elif item.key in generators:
+            data["power"]["generators"][item.key] = (
+                data["power"]["generators"].get(item.key, 0) + item.power_output
+            )
+            data["power"]["total_power"] += item.power_output
+
+    rich_print(f"[green]✔ {item.name} acheté ![/green]")
+    save_game(data)

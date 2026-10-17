@@ -13,6 +13,8 @@ from data.machines import machines
 from data.generators import generators
 from core.pipeline import process_drop
 from core.machine_actions import process_wood_sawmill, process_alloy_factory
+from core.shop import shop_menu
+
 
 
 
@@ -212,6 +214,30 @@ def show_base(data):
 
     rich_print("\n")
     rich_print(panel)
+
+
+def tycoon_menu(data):
+    while True:
+        rich_print("\n[bold cyan]=== TYCOON MENU ===[/bold cyan]")
+        print("1. Show Grid")
+        print("2. Place Machine")
+        print("3. Remove Machine")
+        print("4. Back")
+
+        sub = input("Choisis une option : ")
+
+        if sub == "1":
+            show_grid(data)
+        elif sub == "2":
+            place_machine(data)
+        elif sub == "3":
+            remove_machine(data)
+        elif sub == "4":
+            break
+        else:
+            rich_print("[red]❌ Option invalide.[/red]")
+
+#===FONCTIONS POUR LE PLACEMENT/RETIREMENT DE MACHINE DANS LE TYCOON===#
 
 def show_grid(data):
     rich_print("\n[bold cyan]=== TYCOON GRID ===[/bold cyan]")
@@ -916,19 +942,12 @@ def main():
         print("1. Mine (Stone)")
         print("2. Inventory")
         print("3. Sell")
-        print("4. Build Depot")
-        print("5. Build Dropper")
-        print("6. Build Upgrader")
-        print("7. Build Collector")
-        print("8. Build Special Machine")
-        print("9. Base")
-        print("10. Exit")
-        print("11. Build Generator")
-        print("12. Process Drop")
-        print("13. Use Machines")
-        print("14. View Tycoon")
-
-
+        print("4. Shop")
+        print("5. Base")
+        print("6. Exit")
+        print("7. Process Drop (Debug)")
+        print("8. Use Machines")
+        print("9. View Tycoon")
         choice = input("Choisis une option : ")
 
         if choice == "1":
@@ -938,47 +957,19 @@ def main():
         elif choice == "3":
             sell_material(data)
         elif choice == "4":
-            build_depot(data)
+            shop_menu(data)
         elif choice == "5":
-            build_dropper(data)
-        elif choice == "6":
-            build_upgrader(data)
-        elif choice == "7":
-            build_collector(data)
-        elif choice == "8":
-            build_special_machine(data)
-        elif choice == "9":
             show_base(data)
-        elif choice == "10":
+        elif choice == "6":
             rich_print("[bold red]👋 Au revoir Esteban ![/bold red]")
             save_game(data)
             break
-        elif choice == "11":
-            build_generator(data)
-        elif choice == "12":
+        elif choice == "7":
             process_one_drop(data)
-        elif choice == "13":
+        elif choice == "8":
             use_machines(data)
-        elif choice == "14":
-            while True:
-                rich_print("\n[bold cyan]=== TYCOON MENU ===[/bold cyan]")
-                print("1. Show Grid")
-                print("2. Place Machine")
-                print("3. Remove Machine")
-                print("4. Back")
-
-                sub = input("Choisis une option : ")
-
-                if sub == "1":
-                    show_grid(data)
-                elif sub == "2":
-                    place_machine(data)
-                elif sub == "3":
-                    remove_machine(data)
-                elif sub == "4":
-                    break
-                else:
-                    rich_print("[red]❌ Option invalide.[/red]")
+        elif choice == "9":
+            tycoon_menu(data)
         else:
             rich_print("[red]❌ Option invalide.[/red]")
 
