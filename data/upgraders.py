@@ -36,8 +36,8 @@ class Upgrader:
         return f"[{color}]{self.name}[/{color}]"
 
 upgraders = {
-    "stone_refiner": Upgrader(
-        key="stone_refiner",
+    "primitive_stone_refiner": Upgrader(
+        key="primitive_stone_refiner",
         name="Primitive Stone Refiner",
         tier="Primal",
         type="add",              # ajoute une valeur fixe

@@ -10,7 +10,7 @@ from data.collectors import collectors
 from data.machines import machines
 from data.generators import generators
 from data.materials import materials
-from core.power import format_resource, format_money
+from core.power import format_resource, format_money, format_power
 
 
 
@@ -78,37 +78,83 @@ def shop_category(data, category_dict, category_name):
 def show_preview(data, item):
     text = ""
 
+    # === Tier ===
     if hasattr(item, "tier"):
         text += f"Tier : {item.tier}\n"
 
+    # === Base Value (droppers) ===
     if hasattr(item, "base_value"):
-        text += f"Base Value : {item.base_value}$\n"
+        text += f"Base Value : {format_money(item.base_value)}\n"
 
-    if hasattr(item, "value"):
-        text += f"Upgrade Value : {item.value}\n"
+    # === Upgrader details ===
+    if item in upgraders.values():
 
+        # Type d'amélioration
+        if item.type == "mult":
+            text += f"Upgrade Value : x{item.value}\n"
+
+        elif item.type == "add":
+            text += f"Upgrade Value : +{item.value}$\n"
+
+        elif item.type == "conditional_mult":
+            text += f"Upgrade Value : x{item.value}\n"
+
+        elif item.type == "conditional_add":
+            text += f"Upgrade Value : +{item.value}$\n"
+
+        # Conditions
+        if item.condition:
+            cond_parts = []
+
+            if "min_value" in item.condition:
+                cond_parts.append(f">= {format_money(item.condition['min_value'])}")
+
+            if "max_value" in item.condition:
+                cond_parts.append(f"<= {format_money(item.condition['max_value'])}")
+
+            cond_text = " and ".join(cond_parts)
+            text += f"Condition : {cond_text}\n"
+
+        # Limite d'utilisation
+        if item.max_uses is not None:
+            text += f"Use Limit : {item.max_uses}\n"
+
+    # === Collector multiplier ===
     if hasattr(item, "multiplier"):
         text += f"Multiplier : x{item.multiplier}\n"
 
+    # === Power Required ===
     if hasattr(item, "power_required"):
-        text += f"Power Required : {item.power_required}u\n"
+        text += f"Power Required : {format_power(item.power_required)}\n"
 
+    # === Drop Time ===
     if hasattr(item, "drop_time"):
         text += f"Drop Time : {item.drop_time}s\n"
+    
+    # === Depot Production ===
+    if item in depots.values():
+        # Un dépôt produit toujours une seule ressource pour l'instant
+        # On récupère la quantité produite (ex: {"stone": 1})
+        produced_amount = list(item.production.values())[0]
+
+        formatted_amount = format_resource(produced_amount)
+
+        text += f"Production : {formatted_amount} / {item.production_time}s\n"
+
 
     text += "\n"
 
+    # === Cost Money ===
     if hasattr(item, "cost_money"):
         text += f"Cost Money : {format_money(item.cost_money)}\n"
 
-
+    # === Cost Materials ===
     if hasattr(item, "cost_materials") and item.cost_materials:
         text += "Cost Materials :\n"
         for mat_key, amt in item.cost_materials.items():
             mat = materials[mat_key]
             owned = data["inventory"].get(mat_key, 0)
 
-            # symbole entre crochets + nom coloré
             colored_symbol = f"[{mat.color}][{mat.symbol}][/{mat.color}]"
             colored_name = f"[{mat.color}]{mat.name}[/{mat.color}]"
 
@@ -119,9 +165,15 @@ def show_preview(data, item):
 
     text += "\n"
 
+    # === Power Output (generators) ===
+    if hasattr(item, "power_output"):
+        text += f"Power Output : {format_power(item.power_output)}\n"
+
+    # === Description ===
     if hasattr(item, "description"):
         text += f"Description : {item.description}\n"
 
+    # === Panel ===
     panel = Panel(
         text,
         title=item.colored_name(),
