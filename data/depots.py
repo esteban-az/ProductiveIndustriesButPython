@@ -62,7 +62,7 @@ depots = {
         cost_money=7500,
         cost_materials={"stone": 1000, "wooden_planks" : 250, "coal" : 10},
         production={"iron": 1},
-        production_time=2,          # produit toutes les 5 secondes
+        production_time=2,          
         power_required=500,
         description="Mines iron ore veins deep underground."
     ),

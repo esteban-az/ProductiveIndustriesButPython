@@ -2,7 +2,7 @@ from core.colors import TIER_COLORS
 from colorama import Style
 
 class Dropper:
-    def __init__(self, key, name, tier, base_value, cost_money, cost_materials, power_required, description):
+    def __init__(self, key, name, tier, base_value, cost_money, cost_materials, power_required, description, drop_time):
         self.key = key
         self.name = name
         self.tier = tier
@@ -11,6 +11,7 @@ class Dropper:
         self.cost_materials = cost_materials
         self.power_required = power_required
         self.description = description
+        self.drop_time = drop_time
 
     def colored_name(self):
         color = TIER_COLORS[self.tier]
@@ -25,6 +26,7 @@ droppers = {
         cost_money=100,               # coût en argent
         cost_materials={"stone": 25}, # coût en matériaux
         power_required=10,            # énergie nécessaire
+        drop_time=5,                   # temps de drop
         description="Drops basic stone fragments worth 1$."
     ),
     
@@ -36,6 +38,7 @@ droppers = {
         cost_money=2500,               # coût en argent
         cost_materials={"stone": 300, "wooden_planks" : 200, "wood" : 100}, # coût en matériaux
         power_required=100,            # énergie nécessaire
+        drop_time=3,
         description="A reinforced version of the Stone Dropper, drops bigger stone fragments worth 10$ each."
     )
 }

@@ -67,6 +67,12 @@ def init_game():
     if "depot_timers" not in data:
         data["depot_timers"] = {}
     
+    if "dropper_timers" not in data:
+        data["dropper_timers"] = {}
+        
+    if "auto_collect_buffer" not in data:
+        data["auto_collect_buffer"] = 0
+
     # Grille 10x10
     if "grid" not in data:
         data["grid"] = [["." for _ in range(10)] for _ in range(10)]
@@ -86,6 +92,10 @@ def init_game():
 
 def show_inventory(data):
     rich_print("\n[bold cyan]=== INVENTORY ===[/bold cyan]")
+    
+    if data["auto_collect_buffer"] > 0:
+        rich_print(f"[green]💰 Gains automatiques : {format_money(data['auto_collect_buffer'])}[/green]")
+        data["auto_collect_buffer"] = 0
 
     money = data["inventory"].get("money", 0)
     if money > 0:
@@ -147,41 +157,34 @@ def show_base(data):
             rich_print(f"{gen.colored_name()} x {count} → {format_power(total_power)}")
 
     # ============================
-    #   ENERGY PANEL
+    #   CONSOMMATION BASÉE SUR LES MACHINES PLACÉES
     # ============================
 
-    # Calcul consommation totale
     total_consumption = 0
 
-    # Depots
+    # Machines placées dans la grille
+    for pos_key, machine_key in data["placed"].items():
+
+        if machine_key in droppers:
+            total_consumption += droppers[machine_key].power_required
+
+        elif machine_key in upgraders:
+            total_consumption += upgraders[machine_key].power_required
+
+        elif machine_key in collectors:
+            total_consumption += collectors[machine_key].power_required
+
+        elif machine_key in machines:
+            machine = machines[machine_key]
+            if hasattr(machine, "power_required"):
+                total_consumption += machine.power_required
+
+    # Dépôts dans la BASE (eux ne sont pas placés dans la grille)
     for key, count in data["machines"]["depots"].items():
         depot = depots.get(key)
         if depot:
             total_consumption += depot.power_required * count
 
-    # Droppers
-    for key, count in data["machines"]["droppers"].items():
-        dropper = droppers.get(key)
-        if dropper:
-            total_consumption += dropper.power_required * count
-
-    # Upgraders
-    for key, count in data["machines"]["upgraders"].items():
-        upgrader = upgraders.get(key)
-        if upgrader:
-            total_consumption += upgrader.power_required * count
-
-    # Collectors
-    for key, count in data["machines"]["collectors"].items():
-        collector = collectors.get(key)
-        if collector:
-            total_consumption += collector.power_required * count
-
-    # Special machines (si power_required)
-    for key, count in data["machines"]["special"].items():
-        machine = machines.get(key)
-        if machine and hasattr(machine, "power_required"):
-            total_consumption += machine.power_required * count
 
     production = data["power"]["total_power"]
 
@@ -742,38 +745,43 @@ def tick_production(data):
     #   SURCHARGE : STOP PRODUCTION
     # ============================
 
-    # Calcul consommation totale
+        # ============================
+    #   CONSOMMATION BASÉE SUR LES MACHINES PLACÉES
+    # ============================
+
     total_consumption = 0
 
-    # Depots
+    # Machines placées dans la grille
+    for pos_key, machine_key in data["placed"].items():
+
+        # Dropper
+        if machine_key in droppers:
+            total_consumption += droppers[machine_key].power_required
+
+        # Upgrader
+        elif machine_key in upgraders:
+            total_consumption += upgraders[machine_key].power_required
+
+        # Collector
+        elif machine_key in collectors:
+            total_consumption += collectors[machine_key].power_required
+
+        # Dépôts placés (si un jour tu les places)
+        elif machine_key in depots:
+            total_consumption += depots[machine_key].power_required
+
+        # Machines spéciales
+        elif machine_key in machines:
+            machine = machines[machine_key]
+            if hasattr(machine, "power_required"):
+                total_consumption += machine.power_required
+
+    # Dépôts dans la BASE (eux ne sont pas placés dans la grille)
     for key, count in data["machines"]["depots"].items():
         depot = depots.get(key)
         if depot:
             total_consumption += depot.power_required * count
 
-    # Droppers
-    for key, count in data["machines"]["droppers"].items():
-        dropper = droppers.get(key)
-        if dropper:
-            total_consumption += dropper.power_required * count
-
-    # Upgraders
-    for key, count in data["machines"]["upgraders"].items():
-        upgrader = upgraders.get(key)
-        if upgrader:
-            total_consumption += upgrader.power_required * count
-
-    # Collectors
-    for key, count in data["machines"]["collectors"].items():
-        collector = collectors.get(key)
-        if collector:
-            total_consumption += collector.power_required * count
-
-    # Special machines
-    for key, count in data["machines"]["special"].items():
-        machine = machines.get(key)
-        if machine and hasattr(machine, "power_required"):
-            total_consumption += machine.power_required * count
 
     # Si surcharge → production stoppée
     if total_power < total_consumption:
@@ -801,6 +809,87 @@ def tick_production(data):
                 data["inventory"][mat_key] = data["inventory"].get(mat_key, 0) + amount * count
 
             data["depot_timers"][depot_key] = 0
+    # ============================
+    #   PRODUCTION AUTOMATIQUE DES DROPPERS
+    # ============================
+
+    grid = data["grid"]
+
+    for pos_key, machine_key in data["placed"].items():
+        if machine_key not in droppers:
+            continue
+
+        # Coordonnées
+        x, y = map(int, pos_key.split(","))
+
+        dropper = droppers[machine_key]
+
+        # Vérifier énergie
+        if total_power < dropper.power_required:
+            continue
+
+        # Timer
+        if pos_key not in data["dropper_timers"]:
+            data["dropper_timers"][pos_key] = 0
+
+        data["dropper_timers"][pos_key] += 1
+
+        if data["dropper_timers"][pos_key] < dropper.drop_time:
+            continue
+
+        # Reset timer
+        data["dropper_timers"][pos_key] = 0
+
+        # ============================
+        #   PIPELINE : D → U → C
+        # ============================
+
+        value = dropper.base_value
+
+        cx = x + 1
+        cy = y
+
+        while cx < 10:
+            cell = grid[cy][cx]
+
+            # === Upgrader ===
+            if cell == "U":
+                key = data["placed"][f"{cx},{cy}"]
+                upgrader = upgraders[key]
+
+                # Conditions
+                if upgrader.condition:
+                    if "min_value" in upgrader.condition and value < upgrader.condition["min_value"]:
+                        cx += 1
+                        continue
+                    if "max_value" in upgrader.condition and value > upgrader.condition["max_value"]:
+                        cx += 1
+                        continue
+
+                # max_uses
+                uses = upgrader.max_uses if upgrader.max_uses is not None else 1
+
+                for _ in range(uses):
+                    if upgrader.type == "add":
+                        value += upgrader.value
+                    elif upgrader.type == "mult":
+                        value *= upgrader.value
+                    elif upgrader.type == "conditional_add":
+                        value += upgrader.value
+                    elif upgrader.type == "conditional_mult":
+                        value *= upgrader.value
+
+            # === Collector ===
+            elif cell == "C":
+                key = data["placed"][f"{cx},{cy}"]
+                collector = collectors[key]
+
+                value *= collector.multiplier
+                data["inventory"]["money"] += value
+                data["auto_collect_buffer"] += value
+                break
+
+            cx += 1
 
     save_game(data)
 
