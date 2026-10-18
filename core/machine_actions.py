@@ -4,14 +4,23 @@ from data.materials import materials
 from data.alloys import alloy_recipes_2m
 from data.machines import machines
 from core.save import save_game
+from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
+import time
 
 
 # ============================
 #   WOOD SAWMILL
 # ============================
 
+
+
 def process_wood_sawmill(data):
     rich_print("\n[bold cyan]=== WOOD SAWMILL ===[/bold cyan]")
+
+    # Vérifier surcharge globale
+    if data["power"]["total_power"] < data["power"].get("last_consumption", 0):
+        rich_print("[red]❌ La base est en surcharge énergétique. Machines spéciales désactivées.[/red]")
+        return
 
     wood_amount = data["inventory"].get("wood", 0)
     if wood_amount <= 0:
@@ -39,10 +48,27 @@ def process_wood_sawmill(data):
     machine = machines["wood_sawmill"]
     required_power = machine.power_required * sawmills
 
+    # Vérifier énergie locale
     if data["power"]["total_power"] < required_power:
         rich_print("[red]❌ Pas assez d'énergie pour utiliser le Wood Sawmill.[/red]")
         return
 
+    # Temps de process (10 secondes)
+    PROCESS_TIME = 10
+
+    rich_print("[yellow]⚙ Le Wood Sawmill commence à travailler...[/yellow]")
+
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TimeRemainingColumn(),
+    ) as progress:
+        task = progress.add_task("Transformation en cours...", total=PROCESS_TIME)
+        for _ in range(PROCESS_TIME):
+            time.sleep(1)
+            progress.update(task, advance=1)
+
+    # Transformation finale
     planks = amount * 4
 
     data["inventory"]["wood"] -= amount
@@ -61,11 +87,16 @@ def process_wood_sawmill(data):
 # ============================
 def process_alloy_factory(data):
     rich_print("\n[bold cyan]=== ALLOY FACTORY ===[/bold cyan]")
+    
+    # Stop global si surcharge
+    if data["power"]["total_power"] < data["power"].get("last_consumption", 0):
+        rich_print("[red]❌ La base est en surcharge énergétique. Machines spéciales désactivées.[/red]")
+        return
 
     # Liste des alliages disponibles
-    print("Quels alliage veux-tu fabriquer ?")
+    rich_print("Quels alliage veux-tu fabriquer ?")
     for alloy in alloy_recipes_2m:
-        print(f"- {alloy}")
+        rich_print(f"- {alloy}")
 
     choice = input("Alloy : ").lower()
 
@@ -77,6 +108,7 @@ def process_alloy_factory(data):
     inputs = recipe["inputs"]
     output_amount = recipe["output"]
     machine_key = recipe["machine_key"]
+    process_time = recipe.get("time", 10)  # fallback si pas défini
 
     # Vérifier que la machine existe dans la base
     machines_count = data["machines"]["special"].get(machine_key, 0)
@@ -84,7 +116,7 @@ def process_alloy_factory(data):
         rich_print("[red]❌ Tu n'as pas d'Alloy Factory dans ta base.[/red]")
         return
 
-    # Vérifier que la machine est alimentée (comme Wood Sawmill)
+    # Vérifier énergie locale
     machine = machines[machine_key]
     required_power = machine.power_required * machines_count
 
@@ -123,6 +155,21 @@ def process_alloy_factory(data):
     for mat, amt in inputs.items():
         data["inventory"][mat] -= amt * amount
 
+    # Temps de process
+    rich_print(f"[yellow]⚙ Fabrication de {choice} en cours...[/yellow]")
+
+    total_time = process_time * amount
+
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TimeRemainingColumn(),
+    ) as progress:
+        task = progress.add_task(f"Création de {choice}...", total=total_time)
+        for _ in range(total_time):
+            time.sleep(1)
+            progress.update(task, advance=1)
+
     # Donner l'alliage
     data["inventory"][choice] = data["inventory"].get(choice, 0) + (output_amount * amount)
 
@@ -134,3 +181,4 @@ def process_alloy_factory(data):
     rich_print(f"[green]+{output_amount * amount} {choice}[/green]")
 
     save_game(data)
+

@@ -94,14 +94,14 @@ upgraders = {
         name="Basic Ore Refiner",
         tier="Basic",
         type="conditional_mult",
-        value=3,                     # x3
+        value=2.5,                     # x3
         max_uses=None,               # pas de limite
         condition={
             "max_value": 1000        # fonctionne uniquement si drop <= 1k$
         },
-        cost_money=15000,
-        cost_materials={"stone": 200, "coal": 35},
-        power_required=1000,         # 1ku
+        cost_money=20000,
+        cost_materials={"stone": 600, "coal": 35, "iron": 10},
+        power_required=5000,         # 1ku
         description=(
             "Multiplies drop value by x3 as long as the drop is worth <= 1k$. "
             "Stops working once the drop exceeds 1k$."

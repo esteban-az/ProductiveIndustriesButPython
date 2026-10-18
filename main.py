@@ -15,6 +15,7 @@ from data.generators import generators
 from data.conveyors import conveyors
 from core.machine_actions import process_wood_sawmill, process_alloy_factory
 from core.shop import shop_menu
+from core.pipeline import run_pipeline
 
 
 # ============================
@@ -395,6 +396,8 @@ def remove_machine(data):
 from rich.panel import Panel
 from rich import print as rich_print
 
+from core.pipeline import run_pipeline
+
 def debug_setup(data):
     rich_print("\n[bold cyan]=== DEBUG SETUP ===[/bold cyan]")
 
@@ -414,23 +417,21 @@ def debug_setup(data):
     x, y = map(int, pos_key.split(","))
 
     dropper = droppers[machine_key]
-    value = dropper.base_value
-
     logs = []
-    logs.append(f"[yellow]Dropper {dropper.name}[/yellow] : Base Value = {format_money(value)}")
+    logs.append(f"[yellow]Dropper {dropper.name}[/yellow] : Base Value = {format_money(dropper.base_value)}")
 
-    # Pipeline directionnel identique à tick_production
+    # Pipeline directionnel avec logs
+    grid = data["grid"]
     dx, dy = 1, 0
     cx, cy = x + dx, y + dy
-
-    grid = data["grid"]
     visited = set()
 
-    # Compteur d'utilisation par upgrader
+    value = dropper.base_value
     upgrader_usage = {}
 
     while True:
 
+        # Hors grille
         if cx < 0 or cy < 0 or cy >= len(grid) or cx >= len(grid[0]):
             logs.append("[red]Drop fell out of the grid.[/red]")
             break
@@ -470,11 +471,11 @@ def debug_setup(data):
 
             before = value
 
-            # Initialiser compteur
+            # init compteur
             if key not in upgrader_usage:
                 upgrader_usage[key] = 0
 
-            # Vérifier limite d'utilisation
+            # max uses
             if upgrader.max_uses is not None and upgrader_usage[key] >= upgrader.max_uses:
                 logs.append(
                     f"[yellow]Upgrader {upgrader.name}[/yellow] : Max uses limit reached ({upgrader.max_uses})"
@@ -483,7 +484,7 @@ def debug_setup(data):
                 cy += dy
                 continue
 
-            # Conditions
+            # conditions
             cond_ok = True
             if upgrader.condition:
                 if "min_value" in upgrader.condition and value < upgrader.condition["min_value"]:
@@ -499,7 +500,6 @@ def debug_setup(data):
                     cond_ok = False
 
             if cond_ok:
-                # Appliquer l'upgrade
                 if upgrader.type == "add":
                     value += upgrader.value
                 elif upgrader.type == "mult":
@@ -533,18 +533,16 @@ def debug_setup(data):
             logs.append(f"[bold green]Final Drop Value : {format_money(value)}[/bold green]")
             break
 
-        # Case vide → drop tombe
+        # Case vide
         if cell == ".":
             logs.append("[red]Drop fell (empty tile).[/red]")
             break
 
-        # Autre machine → stop
+        # Autre machine
         logs.append(f"[red]Drop stopped on unknown tile '{cell}'.[/red]")
         break
 
-    # Affichage final
-    panel_text = "\n".join(logs)
-    rich_print(Panel(panel_text, title="Debug Pipeline", border_style="cyan"))
+    rich_print(Panel("\n".join(logs), title="Debug Pipeline", border_style="cyan"))
 
 
 
@@ -875,58 +873,41 @@ def use_machines(data):
 
 def tick_production(data):
     total_power = data["power"].get("total_power", 0)
-    # ============================
-    #   SURCHARGE : STOP PRODUCTION
-    # ============================
 
-     # ============================
-    #   CONSOMMATION BASÉE SUR LES MACHINES PLACÉES
+    # ============================
+    #   CONSOMMATION
     # ============================
 
     total_consumption = 0
-
-    # Machines placées dans la grille
     for pos_key, machine_key in data["placed"].items():
-
-        # Dropper
         if machine_key in droppers:
             total_consumption += droppers[machine_key].power_required
-
-        # Upgrader
         elif machine_key in upgraders:
             total_consumption += upgraders[machine_key].power_required
-
-        # Collector
         elif machine_key in collectors:
             total_consumption += collectors[machine_key].power_required
-
-        # Dépôts placés (si un jour tu les places)
-        elif machine_key in depots:
-            total_consumption += depots[machine_key].power_required
-
-        # Machines spéciales
-        elif machine_key in machines:
-            machine = machines[machine_key]
-            if hasattr(machine, "power_required"):
-                total_consumption += machine.power_required
-        
         elif machine_key in conveyors:
-            conveyor = conveyors[machine_key]
-            total_consumption += conveyor.power_required
+            total_consumption += conveyors[machine_key].power_required
 
-
-    # Dépôts dans la BASE (eux ne sont pas placés dans la grille)
     for key, count in data["machines"]["depots"].items():
         depot = depots.get(key)
         if depot:
             total_consumption += depot.power_required * count
 
+    # 🔥 Sauvegarde de la consommation globale pour les machines spéciales
+    data["power"]["last_consumption"] = total_consumption
 
-    # Si surcharge → production stoppée
+    # ============================
+    #   SI SURCHARGE → STOP TOUT
+    # ============================
+
     if total_power < total_consumption:
-        # On ne produit rien, mais on ne bloque pas le jeu
+        # On ne produit RIEN : ni dépôts, ni droppers
         return
 
+    # ============================
+    #   PRODUCTION DES DÉPÔTS
+    # ============================
 
     for depot_key in data["machines"]["depots"]:
         if depot_key not in data["depot_timers"]:
@@ -937,10 +918,6 @@ def tick_production(data):
         if not depot:
             continue
 
-        required = depot.power_required * count
-        if total_power < required:
-            continue
-
         data["depot_timers"][depot_key] += 1
 
         if data["depot_timers"][depot_key] >= depot.production_time:
@@ -948,26 +925,20 @@ def tick_production(data):
                 data["inventory"][mat_key] = data["inventory"].get(mat_key, 0) + amount * count
 
             data["depot_timers"][depot_key] = 0
+
     # ============================
     #   PRODUCTION AUTOMATIQUE DES DROPPERS
     # ============================
-
-    grid = data["grid"]
 
     for pos_key, machine_key in data["placed"].items():
         if machine_key not in droppers:
             continue
 
-        # Coordonnées
         x, y = map(int, pos_key.split(","))
 
         dropper = droppers[machine_key]
 
-        # Vérifier énergie
-        if total_power < dropper.power_required:
-            continue
-
-        # Timer
+        # timer
         if pos_key not in data["dropper_timers"]:
             data["dropper_timers"][pos_key] = 0
 
@@ -976,107 +947,16 @@ def tick_production(data):
         if data["dropper_timers"][pos_key] < dropper.drop_time:
             continue
 
-        # Reset timer
         data["dropper_timers"][pos_key] = 0
 
-        # ============================
-        #   PIPELINE DIRECTIONNEL
-        # ============================
+        # pipeline
+        result = run_pipeline(data, (x, y))
 
-        value = dropper.base_value
-
-        # Direction initiale : droite
-        dx, dy = 1, 0
-
-        cx, cy = x + dx, y + dy
-
-        visited = set()  # sécurité anti-boucle
-
-        while True:
-
-            # Sécurité : hors grille
-            if cx < 0 or cy < 0 or cy >= len(grid) or cx >= len(grid[0]):
-                break
-
-            pos = (cx, cy)
-
-            # Sécurité anti-boucle
-            if pos in visited:
-                break
-            visited.add(pos)
-
-            cell = grid[cy][cx]
-
-            # === Conveyor ===
-            if cell in ["CR", "CL", "CU", "CD"]:
-                key = data["placed"][f"{cx},{cy}"]
-                conv = conveyors[key]
-
-                if conv.direction == "right":
-                    dx, dy = 1, 0
-                elif conv.direction == "left":
-                    dx, dy = -1, 0
-                elif conv.direction == "up":
-                    dx, dy = 0, -1
-                elif conv.direction == "down":
-                    dx, dy = 0, 1
-
-                cx += dx
-                cy += dy
-                continue
-
-            # === Upgrader ===
-            if cell == "U":
-                key = data["placed"][f"{cx},{cy}"]
-                upgrader = upgraders[key]
-
-                if upgrader.condition:
-                    if "min_value" in upgrader.condition and value < upgrader.condition["min_value"]:
-                        pass
-                    elif "max_value" in upgrader.condition and value > upgrader.condition["max_value"]:
-                        pass
-                    else:
-                        if upgrader.type == "add":
-                            value += upgrader.value
-                        elif upgrader.type == "mult":
-                            value *= upgrader.value
-                        elif upgrader.type == "conditional_add":
-                            value += upgrader.value
-                        elif upgrader.type == "conditional_mult":
-                            value *= upgrader.value
-                else:
-                    if upgrader.type == "add":
-                        value += upgrader.value
-                    elif upgrader.type == "mult":
-                        value *= upgrader.value
-                    elif upgrader.type == "conditional_add":
-                        value += upgrader.value
-                    elif upgrader.type == "conditional_mult":
-                        value *= upgrader.value
-
-                cx += dx
-                cy += dy
-                continue
-
-            # === Collector ===
-            if cell == "C":
-                key = data["placed"][f"{cx},{cy}"]
-                collector = collectors[key]
-
-                value *= collector.multiplier
-                data["inventory"]["money"] += value
-                data["auto_collect_buffer"] += value
-                break
-
-            # === Case vide → le drop tombe (stop)
-            if cell == ".":
-                break
-
-            # === Autre machine → stop
-            break
+        if result is not None:
+            data["inventory"]["money"] += result
+            data["auto_collect_buffer"] += result
 
     save_game(data)
-
 
 # ============================
 #   MAIN LOOP

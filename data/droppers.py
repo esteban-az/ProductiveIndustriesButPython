@@ -48,9 +48,9 @@ droppers = {
         name="Thrash Thrower",
         tier="Primal",
         base_value=100,                 
-        cost_money=8000,               
-        cost_materials={"stone": 500, "coal": 5},
-        power_required=1000,           
+        cost_money=15000,               
+        cost_materials={"stone": 1000, "coal": 100,"iron": 15},
+        power_required=3000,           
         drop_time=6,
         description="A man's trash is one's treasure, drops trashbags that are worth 100$ every 6 seconds."
     ),

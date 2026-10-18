@@ -34,9 +34,9 @@ conveyors = {
         name="Conveyor Right",
         direction="right",
         symbol="CR",
-        cost_money=50,
-        cost_materials={"stone": 10},
-        power_required=1,
+        cost_money=5000,
+        cost_materials={"iron": 15},
+        power_required=100,
         description="Moves drops to the right."
     ),
 
@@ -45,9 +45,9 @@ conveyors = {
         name="Conveyor Left",
         direction="left",
         symbol="CL",
-        cost_money=50,
-        cost_materials={"stone": 10},
-        power_required=1,
+        cost_money=5000,
+        cost_materials={"iron": 15},
+        power_required=100,
         description="Moves drops to the left."
     ),
 
@@ -56,9 +56,9 @@ conveyors = {
         name="Conveyor Up",
         direction="up",
         symbol="CU",
-        cost_money=50,
-        cost_materials={"stone": 10},
-        power_required=1,
+        cost_money=5000,
+        cost_materials={"iron": 15},
+        power_required=100,
         description="Moves drops upward."
     ),
 
@@ -67,9 +67,9 @@ conveyors = {
         name="Conveyor Down",
         direction="down",
         symbol="CD",
-        cost_money=50,
-        cost_materials={"stone": 10},
-        power_required=1,
+        cost_money=5000,
+        cost_materials={"iron": 15},
+        power_required=100,
         description="Moves drops downward."
     ),
 }
