@@ -9,8 +9,10 @@ def load_game():
             data = json.load(f)
 
         # === FIX GRID ===
-        if "grid" not in data or not isinstance(data["grid"], list) or len(data["grid"]) != 10:
-            data["grid"] = [["." for _ in range(10)] for _ in range(10)]
+        if "grid" not in data or not isinstance(data["grid"], list):
+            # Si aucune grille → créer une grille vide 20x20
+            data["grid"] = [["." for _ in range(20)] for _ in range(20)]
+
 
         # === FIX PLACED ===
         if "placed" not in data or not isinstance(data["placed"], dict):

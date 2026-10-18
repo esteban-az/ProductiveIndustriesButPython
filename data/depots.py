@@ -30,7 +30,7 @@ depots = {
         cost_money=250,
         cost_materials={"stone": 50},
         production={"stone": 1},
-        production_time=8,
+        production_time=6,
         power_required=10,
         description="Mines stone from ground level."
     ),
@@ -42,7 +42,7 @@ depots = {
         cost_money=1000,
         cost_materials={"stone": 100},
         production={"wood": 1},
-        production_time=12,
+        production_time=5,
         power_required=40,
         description="A basic machine that cuts wood automatically."
     ),

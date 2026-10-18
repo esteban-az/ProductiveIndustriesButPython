@@ -1,3 +1,4 @@
+# main
 import time
 from rich import print as rich_print
 
@@ -11,9 +12,11 @@ from data.upgraders import upgraders
 from data.collectors import collectors
 from data.machines import machines
 from data.generators import generators
+from data.conveyors import conveyors
 from core.pipeline import process_drop
 from core.machine_actions import process_wood_sawmill, process_alloy_factory
 from core.shop import shop_menu
+
 
 
 
@@ -47,7 +50,8 @@ def init_game():
         "droppers": {},
         "upgraders": {},
         "collectors": {},
-        "special": {}
+        "special": {},
+        "conveyors": {}
     }
 
     for key, value in base_machines.items():
@@ -75,9 +79,25 @@ def init_game():
     if "auto_collect_buffer" not in data:
         data["auto_collect_buffer"] = 0
 
-    # Grille 10x10
+    # Grille 20x20 (corrige aussi les anciennes sauvegardes)
+    GRID_W = 20
+    GRID_H = 20
+
+    # Si la grille n'existe pas → on la crée
     if "grid" not in data:
-        data["grid"] = [["." for _ in range(10)] for _ in range(10)]
+        data["grid"] = [["." for _ in range(GRID_W)] for _ in range(GRID_H)]
+
+    # Si la grille existe mais n'est pas 20x20 → on l'agrandit SANS effacer les machines
+    else:
+        old_grid = data["grid"]
+        new_grid = [["." for _ in range(GRID_W)] for _ in range(GRID_H)]
+
+        # Copier l'ancienne grille dans la nouvelle
+        for y in range(min(len(old_grid), GRID_H)):
+            for x in range(min(len(old_grid[0]), GRID_W)):
+                new_grid[y][x] = old_grid[y][x]
+
+        data["grid"] = new_grid
 
     # Machines placées
     if "placed" not in data:
@@ -157,6 +177,14 @@ def show_base(data):
         if gen:
             count = total_power // gen.power_output
             rich_print(f"{gen.colored_name()} x {count} → {format_power(total_power)}")
+    
+    # Conveyors
+    rich_print("\n[bold]Conveyors :[/bold]")
+    for key, count in data["machines"]["conveyors"].items():
+        conv = conveyors.get(key)
+        if conv:
+            rich_print(f"{conv.colored_name()} x {count}")
+
             
     # Pylons (trophées persistants)
     rich_print("\n[bold]Pylons :[/bold]")
@@ -189,6 +217,11 @@ def show_base(data):
             machine = machines[machine_key]
             if hasattr(machine, "power_required"):
                 total_consumption += machine.power_required
+        
+        elif machine_key in conveyors:
+            conv = conveyors[machine_key]
+            total_consumption += conv.power_required
+
 
     # Dépôts dans la BASE (eux ne sont pas placés dans la grille)
     for key, count in data["machines"]["depots"].items():
@@ -231,7 +264,8 @@ def tycoon_menu(data):
         print("1. Show Grid")
         print("2. Place Machine")
         print("3. Remove Machine")
-        print("4. Back")
+        print("4. Test Setup (Debug)")
+        print("5. Back")
 
         sub = input("Choisis une option : ")
 
@@ -242,25 +276,37 @@ def tycoon_menu(data):
         elif sub == "3":
             remove_machine(data)
         elif sub == "4":
+            debug_setup(data)
+        elif sub == "5":
             break
         else:
             rich_print("[red]❌ Option invalide.[/red]")
 
 #===FONCTIONS POUR LE PLACEMENT/RETIREMENT DE MACHINE DANS LE TYCOON===#
 
+from rich.table import Table
+
 def show_grid(data):
     rich_print("\n[bold cyan]=== TYCOON GRID ===[/bold cyan]")
 
-    grid = data["grid"]
+    table = Table(show_header=False, show_lines=True, border_style="cyan")
 
-    for row in grid:
-        rich_print(" ".join(row))
+    # Colonnes
+    for _ in range(len(data["grid"][0])):
+        table.add_column(justify="center")
+
+    # Lignes
+    for row in data["grid"]:
+        table.add_row(*row)
+
+    rich_print(table)
+
 
 def place_machine(data):
     rich_print("\n[bold cyan]=== PLACE MACHINE ===[/bold cyan]")
 
     rich_print("Tu possèdes :")
-    for category in ["droppers", "upgraders", "collectors", "depots", "special"]:
+    for category in ["droppers", "upgraders", "collectors", "depots", "special", "conveyors"]:
         for key, count in data["machines"][category].items():
             if count > 0:
                 rich_print(f"- {key} x{count}")
@@ -284,7 +330,7 @@ def place_machine(data):
         rich_print("[red]❌ Coordonnées invalides.[/red]")
         return
 
-    if not (0 <= x < 10 and 0 <= y < 10):
+    if not (0 <= x < len(data["grid"][0]) and 0 <= y < len(data["grid"])):
         rich_print("[red]❌ Hors de la grille.[/red]")
         return
 
@@ -300,6 +346,8 @@ def place_machine(data):
         code = "C"
     elif machine_key in depots:
         code = "P"
+    elif machine_key in conveyors:
+        code = conveyors[machine_key].symbol
     else:
         code = "S"
 
@@ -308,10 +356,15 @@ def place_machine(data):
     pos_key = f"{x},{y}"
     data["placed"][pos_key] = machine_key
 
-    data["machines"][category][machine_key] -= 1
+    # 🔥 FIX CRITIQUE : retirer la machine de la bonne catégorie
+    for cat in data["machines"]:
+        if machine_key in data["machines"][cat]:
+            data["machines"][cat][machine_key] -= 1
+            break
 
     rich_print(f"[green]✔ Machine placée : {machine_key} en ({x},{y})[/green]")
     save_game(data)
+
 
 
 def remove_machine(data):
@@ -342,6 +395,160 @@ def remove_machine(data):
 
     rich_print(f"[green]✔ Machine retirée : {machine_key}[/green]")
     save_game(data)
+
+from rich.panel import Panel
+from rich import print as rich_print
+
+def debug_setup(data):
+    rich_print("\n[bold cyan]=== DEBUG SETUP ===[/bold cyan]")
+
+    # Trouver un dropper placé
+    droppers_positions = [
+        (pos_key, machine_key)
+        for pos_key, machine_key in data["placed"].items()
+        if machine_key in droppers
+    ]
+
+    if not droppers_positions:
+        rich_print("[red]❌ Aucun dropper placé dans la grille.[/red]")
+        return
+
+    # On prend le premier dropper trouvé
+    pos_key, machine_key = droppers_positions[0]
+    x, y = map(int, pos_key.split(","))
+
+    dropper = droppers[machine_key]
+    value = dropper.base_value
+
+    logs = []
+    logs.append(f"[yellow]Dropper {dropper.name}[/yellow] : Base Value = {format_money(value)}")
+
+    # Pipeline directionnel identique à tick_production
+    dx, dy = 1, 0
+    cx, cy = x + dx, y + dy
+
+    grid = data["grid"]
+    visited = set()
+
+    # Compteur d'utilisation par upgrader
+    upgrader_usage = {}
+
+    while True:
+
+        if cx < 0 or cy < 0 or cy >= len(grid) or cx >= len(grid[0]):
+            logs.append("[red]Drop fell out of the grid.[/red]")
+            break
+
+        pos = (cx, cy)
+        if pos in visited:
+            logs.append("[red]Loop detected, stopping.[/red]")
+            break
+        visited.add(pos)
+
+        cell = grid[cy][cx]
+
+        # Conveyor
+        if cell in ["CR", "CL", "CU", "CD"]:
+            key = data["placed"][f"{cx},{cy}"]
+            conv = conveyors[key]
+
+            logs.append(f"[blue]Conveyor {conv.name}[/blue] : direction → {conv.direction}")
+
+            if conv.direction == "right":
+                dx, dy = 1, 0
+            elif conv.direction == "left":
+                dx, dy = -1, 0
+            elif conv.direction == "up":
+                dx, dy = 0, -1
+            elif conv.direction == "down":
+                dx, dy = 0, 1
+
+            cx += dx
+            cy += dy
+            continue
+
+        # Upgrader
+        if cell == "U":
+            key = data["placed"][f"{cx},{cy}"]
+            upgrader = upgraders[key]
+
+            before = value
+
+            # Initialiser compteur
+            if key not in upgrader_usage:
+                upgrader_usage[key] = 0
+
+            # Vérifier limite d'utilisation
+            if upgrader.max_uses is not None and upgrader_usage[key] >= upgrader.max_uses:
+                logs.append(
+                    f"[yellow]Upgrader {upgrader.name}[/yellow] : Max uses limit reached ({upgrader.max_uses})"
+                )
+                cx += dx
+                cy += dy
+                continue
+
+            # Conditions
+            cond_ok = True
+            if upgrader.condition:
+                if "min_value" in upgrader.condition and value < upgrader.condition["min_value"]:
+                    logs.append(
+                        f"[yellow]Upgrader {upgrader.name}[/yellow] : Drop value too low, no upgrade"
+                    )
+                    cond_ok = False
+
+                if "max_value" in upgrader.condition and value > upgrader.condition["max_value"]:
+                    logs.append(
+                        f"[yellow]Upgrader {upgrader.name}[/yellow] : Drop value too high, no upgrade"
+                    )
+                    cond_ok = False
+
+            if cond_ok:
+                # Appliquer l'upgrade
+                if upgrader.type == "add":
+                    value += upgrader.value
+                elif upgrader.type == "mult":
+                    value *= upgrader.value
+                elif upgrader.type == "conditional_add":
+                    value += upgrader.value
+                elif upgrader.type == "conditional_mult":
+                    value *= upgrader.value
+
+                upgrader_usage[key] += 1
+
+                logs.append(
+                    f"[green]Upgrader {upgrader.name}[/green] : {format_money(before)} → {format_money(value)} (Used {upgrader_usage[key]}x)"
+                )
+
+            cx += dx
+            cy += dy
+            continue
+
+        # Collector
+        if cell == "C":
+            key = data["placed"][f"{cx},{cy}"]
+            collector = collectors[key]
+
+            before = value
+            value *= collector.multiplier
+
+            logs.append(
+                f"[magenta]Collector {collector.name}[/magenta] : {format_money(before)} → {format_money(value)}"
+            )
+            logs.append(f"[bold green]Final Drop Value : {format_money(value)}[/bold green]")
+            break
+
+        # Case vide → drop tombe
+        if cell == ".":
+            logs.append("[red]Drop fell (empty tile).[/red]")
+            break
+
+        # Autre machine → stop
+        logs.append(f"[red]Drop stopped on unknown tile '{cell}'.[/red]")
+        break
+
+    # Affichage final
+    panel_text = "\n".join(logs)
+    rich_print(Panel(panel_text, title="Debug Pipeline", border_style="cyan"))
 
 
 
@@ -780,7 +987,7 @@ def tick_production(data):
     #   SURCHARGE : STOP PRODUCTION
     # ============================
 
-        # ============================
+     # ============================
     #   CONSOMMATION BASÉE SUR LES MACHINES PLACÉES
     # ============================
 
@@ -810,6 +1017,11 @@ def tick_production(data):
             machine = machines[machine_key]
             if hasattr(machine, "power_required"):
                 total_consumption += machine.power_required
+        
+        elif machine_key in conveyors:
+            conveyor = conveyors[machine_key]
+            total_consumption += conveyor.power_required
+
 
     # Dépôts dans la BASE (eux ne sont pas placés dans la grille)
     for key, count in data["machines"]["depots"].items():
@@ -876,45 +1088,86 @@ def tick_production(data):
         data["dropper_timers"][pos_key] = 0
 
         # ============================
-        #   PIPELINE : D → U → C
+        #   PIPELINE DIRECTIONNEL
         # ============================
 
         value = dropper.base_value
 
-        cx = x + 1
-        cy = y
+        # Direction initiale : droite
+        dx, dy = 1, 0
 
-        while cx < 10:
+        cx, cy = x + dx, y + dy
+
+        visited = set()  # sécurité anti-boucle
+
+        while True:
+
+            # Sécurité : hors grille
+            if cx < 0 or cy < 0 or cy >= len(grid) or cx >= len(grid[0]):
+                break
+
+            pos = (cx, cy)
+
+            # Sécurité anti-boucle
+            if pos in visited:
+                break
+            visited.add(pos)
+
             cell = grid[cy][cx]
+
+            # === Conveyor ===
+            if cell in ["CR", "CL", "CU", "CD"]:
+                key = data["placed"][f"{cx},{cy}"]
+                conv = conveyors[key]
+
+                if conv.direction == "right":
+                    dx, dy = 1, 0
+                elif conv.direction == "left":
+                    dx, dy = -1, 0
+                elif conv.direction == "up":
+                    dx, dy = 0, -1
+                elif conv.direction == "down":
+                    dx, dy = 0, 1
+
+                cx += dx
+                cy += dy
+                continue
 
             # === Upgrader ===
             if cell == "U":
                 key = data["placed"][f"{cx},{cy}"]
                 upgrader = upgraders[key]
 
-                # Conditions
                 if upgrader.condition:
                     if "min_value" in upgrader.condition and value < upgrader.condition["min_value"]:
-                        cx += 1
-                        continue
-                    if "max_value" in upgrader.condition and value > upgrader.condition["max_value"]:
-                        cx += 1
-                        continue
+                        pass
+                    elif "max_value" in upgrader.condition and value > upgrader.condition["max_value"]:
+                        pass
+                    else:
+                        if upgrader.type == "add":
+                            value += upgrader.value
+                        elif upgrader.type == "mult":
+                            value *= upgrader.value
+                        elif upgrader.type == "conditional_add":
+                            value += upgrader.value
+                        elif upgrader.type == "conditional_mult":
+                            value *= upgrader.value
+                else:
+                    if upgrader.type == "add":
+                        value += upgrader.value
+                    elif upgrader.type == "mult":
+                        value *= upgrader.value
+                    elif upgrader.type == "conditional_add":
+                        value += upgrader.value
+                    elif upgrader.type == "conditional_mult":
+                        value *= upgrader.value
 
-                # max_uses
-                # Un upgrader s'applique UNE SEULE FOIS
-                if upgrader.type == "add":
-                    value += upgrader.value
-                elif upgrader.type == "mult":
-                    value *= upgrader.value
-                elif upgrader.type == "conditional_add":
-                    value += upgrader.value
-                elif upgrader.type == "conditional_mult":
-                    value *= upgrader.value
-
+                cx += dx
+                cy += dy
+                continue
 
             # === Collector ===
-            elif cell == "C":
+            if cell == "C":
                 key = data["placed"][f"{cx},{cy}"]
                 collector = collectors[key]
 
@@ -923,7 +1176,12 @@ def tick_production(data):
                 data["auto_collect_buffer"] += value
                 break
 
-            cx += 1
+            # === Case vide → le drop tombe (stop)
+            if cell == ".":
+                break
+
+            # === Autre machine → stop
+            break
 
     save_game(data)
 

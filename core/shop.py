@@ -13,6 +13,8 @@ from data.materials import materials
 from core.power import format_resource, format_money, format_power
 from core.packs_system import buy_pack
 from data.packs import packs
+from data.conveyors import conveyors
+
 
 
 
@@ -25,8 +27,9 @@ def shop_menu(data):
         print("4. Collectors")
         print("5. Special Machines")
         print("6. Generators")
-        print("7. Packs")
-        print("8. Back")
+        print("7. Conveyors")
+        print("8. Packs")
+        print("9. Back")
 
         choice = input("Choisis une catégorie : ")
 
@@ -43,8 +46,10 @@ def shop_menu(data):
         elif choice == "6":
             shop_category(data, generators, "Generator")
         elif choice == "7":
-            show_packs_menu(data)
+            shop_category(data, conveyors, "Conveyor")
         elif choice == "8":
+            show_packs_menu(data)
+        elif choice == "9":
             break
         else:
             rich_print("[red]❌ Option invalide.[/red]")
@@ -298,11 +303,14 @@ def buy_item(data, item):
             data["machines"]["depots"][item.key] = 1
         elif item.key in machines:
             data["machines"]["special"][item.key] = 1
+        elif item.key in conveyors:   # ← 🔥 FIX CRITIQUE
+            data["machines"]["conveyors"][item.key] = 1
         elif item.key in generators:
             data["power"]["generators"][item.key] = (
                 data["power"]["generators"].get(item.key, 0) + item.power_output
             )
             data["power"]["total_power"] += item.power_output
+
 
     rich_print(f"[green]✔ {item.name} acheté ![/green]")
     save_game(data)
