@@ -157,6 +157,15 @@ def show_base(data):
         if gen:
             count = total_power // gen.power_output
             rich_print(f"{gen.colored_name()} x {count} → {format_power(total_power)}")
+            
+    # Pylons (trophées persistants)
+    rich_print("\n[bold]Pylons :[/bold]")
+    if data["persistent_trophies"]:
+        for key, count in data["persistent_trophies"].items():
+            rich_print(f"{key} x {count}")
+    else:
+        rich_print("[dim]Aucun pylon obtenu pour l'instant.[/dim]")
+
 
     # ============================
     #   CONSOMMATION BASÉE SUR LES MACHINES PLACÉES

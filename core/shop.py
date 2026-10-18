@@ -11,6 +11,8 @@ from data.machines import machines
 from data.generators import generators
 from data.materials import materials
 from core.power import format_resource, format_money, format_power
+from core.packs_system import buy_pack
+from data.packs import packs
 
 
 
@@ -23,7 +25,8 @@ def shop_menu(data):
         print("4. Collectors")
         print("5. Special Machines")
         print("6. Generators")
-        print("7. Back")
+        print("7. Packs")
+        print("8. Back")
 
         choice = input("Choisis une catégorie : ")
 
@@ -40,6 +43,8 @@ def shop_menu(data):
         elif choice == "6":
             shop_category(data, generators, "Generator")
         elif choice == "7":
+            show_packs_menu(data)
+        elif choice == "8":
             break
         else:
             rich_print("[red]❌ Option invalide.[/red]")
@@ -187,6 +192,76 @@ def show_preview(data, item):
 
     if buy == "y":
         buy_item(data, item)
+
+def show_pack_preview(data, pack):
+    text = ""
+
+    # === Tier ===
+    text += f"Tier : {pack.tier}\n"
+
+    # === Guaranteed Item ===
+    text += f"Guaranteed Item : {pack.guaranteed_item}\n"
+
+    # === Exclusive Machines ===
+    text += "Exclusive Machines :\n"
+    for m in pack.pool:
+        text += f"  - {m}\n"
+
+    text += "\n"
+
+    # === Slot Chances ===
+    text += "Slot Chances :\n"
+    for i, chance in enumerate(pack.slot_chances, 1):
+        pct = int(chance * 100)
+        text += f"  Slot {i} : {pct}%\n"
+
+    text += "\n"
+
+    # === Cost Money ===
+    text += f"Cost Money : {format_money(pack.cost_money)}\n"
+
+    # === Cost Materials ===
+    if pack.cost_materials:
+        text += "Cost Materials :\n"
+        for mat_key, amt in pack.cost_materials.items():
+            owned = data["inventory"].get(mat_key, 0)
+            text += (
+                f"  {mat_key} : "
+                f"{format_resource(owned)} / {format_resource(amt)}\n"
+            )
+
+    text += "\n"
+
+    # === Max Uses per save ===
+    used = data["packs_opened"].get(pack.key, 0)
+    text += f"Max Uses (per save) : {pack.max_uses}\n"
+    text += f"Used in this save : {used}\n"
+
+    # === Panel ===
+    panel = Panel(
+        text,
+        title=f"[cyan]{pack.name}[/cyan]",
+        border_style="cyan",
+        expand=False
+    )
+
+    rich_print(panel)
+
+    buy = input("Acheter ce pack ? (y/n) : ").lower()
+    if buy == "y":
+        buy_pack(data, pack)
+
+
+def show_packs_menu(data):
+    print("\n=== Packs ===")
+    for key, pack in packs.items():
+        print(f"- {pack.name} ({key})")
+
+    sel = input("Quel pack acheter ? (key) : ")
+
+    if sel in packs:
+        show_pack_preview(data, packs[sel])
+
 
 
 def buy_item(data, item):
