@@ -29,14 +29,14 @@ generators = {
         description="Produces 25u using sunlight."
     ),
     
-    "rusty_coal_generator": Generator(
-        key="rusty_coal_generator",
-        name="Rusty Coal Generator",
+    "rusty_charcoal_generator": Generator(
+        key="rusty_charcoal_generator",
+        name="Rusty Charcoal Generator",
         tier="Primal",
         power_output=300,
         cost_money=3000,
-        cost_materials={"stone": 150, "wood": 5},
-        description="An old generator that barely produces energy by consuming coal underground."
+        cost_materials={"stone": 150, "wood": 50},
+        description="An old generator that barely produces energy by consuming charcoal deposits underground."
     ),
     
     "primitive_solar_panel": Generator(
@@ -45,7 +45,7 @@ generators = {
         tier="Primal",
         power_output=1000,
         cost_money=10000,
-        cost_materials={"stone": 500, "wooden_planks": 100, "wood": 100},
+        cost_materials={"stone": 1000, "wooden_planks": 200, "wood": 85},
         description="An direct upgrade to the Basic Solar Cell, generating 1ku of energy from sunlight."
     ),
     
@@ -55,7 +55,7 @@ generators = {
         tier="Basic",
         power_output=7500,
         cost_money=60000,
-        cost_materials={"stone": 2000, "wood": 1000, "coal": 100, "iron": 5},
+        cost_materials={"stone": 5000, "wood": 1500, "coal": 100, "iron": 5},
         description="Generates energy from thermal sources deep underground, this is where your real energy generation starts."
     )
 }

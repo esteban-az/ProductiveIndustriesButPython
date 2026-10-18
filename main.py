@@ -13,12 +13,8 @@ from data.collectors import collectors
 from data.machines import machines
 from data.generators import generators
 from data.conveyors import conveyors
-from core.pipeline import process_drop
 from core.machine_actions import process_wood_sawmill, process_alloy_factory
 from core.shop import shop_menu
-
-
-
 
 
 # ============================
@@ -831,110 +827,6 @@ def build_generator(data):
     save_game(data)
 
 
-def process_one_drop(data):
-    rich_print("\n[bold cyan]=== PROCESS DROP ===[/bold cyan]")
-
-    # Vérification droppers
-    if not data["machines"]["droppers"]:
-        rich_print("[red]❌ Aucun dropper disponible.[/red]")
-        return
-
-    # Vérification collectors
-    if not data["machines"]["collectors"]:
-        rich_print("[red]❌ Aucun collector disponible.[/red]")
-        return
-
-    # ============================
-    #   TROUVER LE MEILLEUR DROPPER
-    # ============================
-
-    best_dropper = None
-    best_dropper_value = 0
-
-    for key, count in data["machines"]["droppers"].items():
-        dropper = droppers[key]
-        if dropper.base_value > best_dropper_value:
-            best_dropper_value = dropper.base_value
-            best_dropper = dropper
-
-    # ============================
-    #   UPGRADERS : STACK COMPLET
-    # ============================
-
-    upgrader_list = []
-
-    for key, count in data["machines"]["upgraders"].items():
-        for _ in range(count):
-            upgrader_list.append(upgraders[key])
-
-    # ============================
-    #   TROUVER LE MEILLEUR COLLECTOR
-    # ============================
-
-    best_collector = None
-    best_collector_value = 1
-
-    for key, count in data["machines"]["collectors"].items():
-        collector = collectors[key]
-        if collector.multiplier > best_collector_value:
-            best_collector_value = collector.multiplier
-            best_collector = collector
-
-    # ============================
-    #   VÉRIFIER L'ÉNERGIE TOTALE
-    # ============================
-    total_power = data["power"]["total_power"]
-    # Calcul consommation totale
-    total_consumption = 0
-
-    # Depots
-    for key, count in data["machines"]["depots"].items():
-        depot = depots.get(key)
-        if depot:
-            total_consumption += depot.power_required * count
-
-    # Droppers
-    for key, count in data["machines"]["droppers"].items():
-        dropper = droppers.get(key)
-        if dropper:
-            total_consumption += dropper.power_required * count
-
-    # Upgraders
-    for key, count in data["machines"]["upgraders"].items():
-        upgrader = upgraders.get(key)
-        if upgrader:
-            total_consumption += upgrader.power_required * count
-
-    # Collectors
-    for key, count in data["machines"]["collectors"].items():
-        collector = collectors.get(key)
-        if collector:
-            total_consumption += collector.power_required * count
-
-    # Special machines
-    for key, count in data["machines"]["special"].items():
-        machine = machines.get(key)
-        if machine and hasattr(machine, "power_required"):
-            total_consumption += machine.power_required * count
-
-    # Vérification surcharge
-    if total_power < total_consumption:
-        rich_print("[red]❌ Impossible d'utiliser votre setup : consommation d'énergie trop élevée.[/red]")
-        return
-
-
-    # ============================
-    #   CALCUL FINAL DU DROP
-    # ============================
-
-    final_value = process_drop(best_dropper, upgrader_list, best_collector)
-
-    data["inventory"]["money"] += final_value
-
-    rich_print(f"[green]💎 Valeur du drop : {format_money(final_value)}[/green]")
-    rich_print(f"[green]💰 Argent total : {format_money(data['inventory']['money'])}[/green]")
-
-    save_game(data)
 
 
 def use_machines(data):
@@ -1211,9 +1103,8 @@ def main():
         print("4. Shop")
         print("5. Base")
         print("6. Exit")
-        print("7. Process Drop (Debug)")
-        print("8. Use Machines")
-        print("9. View Tycoon")
+        print("7. Use Machines")
+        print("8. View Tycoon")
         choice = input("Choisis une option : ")
 
         if choice == "1":
@@ -1231,10 +1122,8 @@ def main():
             save_game(data)
             break
         elif choice == "7":
-            process_one_drop(data)
-        elif choice == "8":
             use_machines(data)
-        elif choice == "9":
+        elif choice == "8":
             tycoon_menu(data)
         else:
             rich_print("[red]❌ Option invalide.[/red]")

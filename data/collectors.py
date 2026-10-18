@@ -37,7 +37,7 @@ collectors = {
         multiplier=1.5,
         cost_money=500,
         cost_materials={"stone" : 60},
-        power_required=5,
+        power_required=45,
         description="Slightly better than the Wooden Collector, process drops at x1.5 their value."
     ),
     
