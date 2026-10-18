@@ -8,7 +8,15 @@ def load_game():
         with open(SAVE_FILE, "r") as f:
             data = json.load(f)
 
-        # === Compatibilité avec anciennes saves ===
+        # === FIX GRID ===
+        if "grid" not in data or not isinstance(data["grid"], list) or len(data["grid"]) != 10:
+            data["grid"] = [["." for _ in range(10)] for _ in range(10)]
+
+        # === FIX PLACED ===
+        if "placed" not in data or not isinstance(data["placed"], dict):
+            data["placed"] = {}
+
+        # === FIX PACK SYSTEM ===
         if "packs_opened" not in data:
             data["packs_opened"] = {}
 
@@ -18,18 +26,11 @@ def load_game():
         if "persistent_trophies" not in data:
             data["persistent_trophies"] = {}
 
-        if "placed" not in data:
-            data["placed"] = {}
-
-        if "grid" not in data:
-            data["grid"] = {}
-
         return data
 
     # === Nouvelle sauvegarde ===
     return {
         "inventory": {},
-
         "machines": {
             "depots": {},
             "droppers": {},
@@ -37,22 +38,15 @@ def load_game():
             "collectors": {},
             "special": {}
         },
-
         "power": {
             "generators": {},
             "total_power": 0
         },
-
-        # Machines placées sur la grille
+        "grid": [["." for _ in range(10)] for _ in range(10)],
         "placed": {},
-
-        # Grille (si tu veux l’utiliser plus tard)
-        "grid": {},
-
-        # === PACK SYSTEM ===
-        "packs_opened": {},          # par save
-        "persistent_machines": {},   # global permanent
-        "persistent_trophies": {},   # global permanent
+        "packs_opened": {},
+        "persistent_machines": {},
+        "persistent_trophies": {}
     }
 
 

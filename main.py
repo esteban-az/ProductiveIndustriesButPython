@@ -902,17 +902,16 @@ def tick_production(data):
                         continue
 
                 # max_uses
-                uses = upgrader.max_uses if upgrader.max_uses is not None else 1
+                # Un upgrader s'applique UNE SEULE FOIS
+                if upgrader.type == "add":
+                    value += upgrader.value
+                elif upgrader.type == "mult":
+                    value *= upgrader.value
+                elif upgrader.type == "conditional_add":
+                    value += upgrader.value
+                elif upgrader.type == "conditional_mult":
+                    value *= upgrader.value
 
-                for _ in range(uses):
-                    if upgrader.type == "add":
-                        value += upgrader.value
-                    elif upgrader.type == "mult":
-                        value *= upgrader.value
-                    elif upgrader.type == "conditional_add":
-                        value += upgrader.value
-                    elif upgrader.type == "conditional_mult":
-                        value *= upgrader.value
 
             # === Collector ===
             elif cell == "C":

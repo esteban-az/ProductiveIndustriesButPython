@@ -14,7 +14,8 @@ class Upgrader:
         cost_money=0,
         cost_materials=None,
         power_required=0,
-        description=""
+        description="",
+        persistent=False
     ):
         self.key = key
         self.name = name
@@ -27,7 +28,7 @@ class Upgrader:
         self.cost_materials = cost_materials or {}
         self.power_required = power_required
         self.description = description
-
+        self.persistent = persistent
         # compteur d'utilisation
         self.uses = 0
 
@@ -43,7 +44,7 @@ upgraders = {
         type="add",              # ajoute une valeur fixe
         value=2,                 # +2$
         max_uses=None,           # pas de limite
-        cost_money=100,
+        cost_money=125,
         cost_materials={"stone": 25},
         power_required=5,
         description="Adds +2$ to any drop. No use limit."
@@ -53,12 +54,57 @@ upgraders = {
         key="stone_upgrader",
         name="Stone Upgrader",
         tier="Primal",
-        type="mult",          # multiplie la valeur
-        value=1.25,           # x1.25
-        max_uses=3,           # limite de 3 utilisations
+        type="mult",
+        value=1.25,           
+        max_uses=5,           
         cost_money=750,
-        cost_materials={"stone": 40, "wood": 15},
-        power_required=5,
+        cost_materials={"stone": 40},
+        power_required=20,
         description="An upgrader made of stone and wood, multiples a drop value by x1.25 up to three times."
+    ),
+    
+    "primal_magnifier": Upgrader(
+        key="primal_magnifier",
+        name="Primal Magnifier",
+        tier="Primal",
+        type="mult",
+        value=2,           
+        max_uses=1,           
+        cost_money=1500,
+        cost_materials={"stone": 100},
+        power_required=100,
+        description="Magnifies your drops by multiplying their value by x2 once."
+    ),
+    
+    "wooden_infuser": Upgrader(
+        key="wooden_infuser",
+        name="Wooden Infuser",
+        tier="Primal",
+        type="add",
+        value=15,           
+        max_uses=None,           
+        cost_money=8000,
+        cost_materials={"stone": 350, "wood": 50},
+        power_required=500,
+        description="Infuses your drops with wood, adding 15$ to their value."
+    ),
+    
+    "basic_ore_refiner": Upgrader(
+        key="basic_ore_refiner",
+        name="Basic Ore Refiner",
+        tier="Basic",
+        type="conditional_mult",
+        value=3,                     # x3
+        max_uses=None,               # pas de limite
+        condition={
+            "max_value": 1000        # fonctionne uniquement si drop <= 1k$
+        },
+        cost_money=15000,
+        cost_materials={"stone": 200, "coal": 35},
+        power_required=1000,         # 1ku
+        description=(
+            "Multiplies drop value by x3 as long as the drop is worth <= 1k$. "
+            "Stops working once the drop exceeds 1k$."
+        )
     )
 }

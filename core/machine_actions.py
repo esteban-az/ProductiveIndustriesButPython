@@ -1,6 +1,7 @@
 from rich import print as rich_print
 from core.colors import MATERIAL_COLORS
 from data.materials import materials
+from data.alloys import alloy_recipes_2m
 from data.machines import machines
 from core.save import save_game
 
@@ -56,25 +57,54 @@ def process_wood_sawmill(data):
 
 
 # ============================
-#   ALLOY FACTORY (STEEL)
+#   ALLOY FACTORY (MODULAR 2 MATERIALS)
 # ============================
-
 def process_alloy_factory(data):
     rich_print("\n[bold cyan]=== ALLOY FACTORY ===[/bold cyan]")
 
-    coal = data["inventory"].get("coal", 0)
-    iron = data["inventory"].get("iron", 0)
+    # Liste des alliages disponibles
+    print("Quels alliage veux-tu fabriquer ?")
+    for alloy in alloy_recipes_2m:
+        print(f"- {alloy}")
 
-    if coal < 2 or iron < 1:
-        rich_print("[red]❌ Pas assez de matériaux pour fabriquer du Steel.[/red]")
-        rich_print("Il faut : 2 Coal + 1 Iron")
+    choice = input("Alloy : ").lower()
+
+    if choice not in alloy_recipes_2m:
+        rich_print("[red]❌ Cet alliage n'existe pas.[/red]")
         return
 
-    rich_print(f"Tu as [#202020]{coal} Coal[/#202020] et [#D8D8D8]{iron} Iron[/#D8D8D8].")
-    rich_print("Ratio : [#202020]2 Coal[/#202020] + [#D8D8D8]1 Iron[/#D8D8D8] → [#C0C0C0]1 Steel[/#C0C0C0]")
+    recipe = alloy_recipes_2m[choice]
+    inputs = recipe["inputs"]
+    output_amount = recipe["output"]
+    machine_key = recipe["machine_key"]
+
+    # Vérifier que la machine existe dans la base
+    machines_count = data["machines"]["special"].get(machine_key, 0)
+    if machines_count <= 0:
+        rich_print("[red]❌ Tu n'as pas d'Alloy Factory dans ta base.[/red]")
+        return
+
+    # Vérifier que la machine est alimentée (comme Wood Sawmill)
+    machine = machines[machine_key]
+    required_power = machine.power_required * machines_count
+
+    if data["power"]["total_power"] < required_power:
+        rich_print("[red]❌ Pas assez d'énergie pour utiliser l'Alloy Factory.[/red]")
+        return
+
+    # Vérifier matériaux
+    for mat, amt in inputs.items():
+        if data["inventory"].get(mat, 0) < amt:
+            rich_print(f"[red]❌ Pas assez de {mat}.[/red]")
+            return
+
+    # Affichage du ratio
+    rich_print("Ratio :")
+    for mat, amt in inputs.items():
+        rich_print(f"  {mat} x{amt}")
 
     try:
-        amount = int(input("Combien de Steel veux-tu fabriquer ? : "))
+        amount = int(input(f"Combien de {choice} veux-tu fabriquer ? : "))
     except ValueError:
         rich_print("[red]❌ Nombre invalide.[/red]")
         return
@@ -83,28 +113,24 @@ def process_alloy_factory(data):
         rich_print("[red]❌ Le nombre doit être > 0.[/red]")
         return
 
-    required_coal = amount * 2
-    required_iron = amount * 1
+    # Vérifier matériaux totaux
+    for mat, amt in inputs.items():
+        if data["inventory"].get(mat, 0) < amt * amount:
+            rich_print("[red]❌ Pas assez de matériaux.[/red]")
+            return
 
-    if coal < required_coal or iron < required_iron:
-        rich_print("[red]❌ Tu n'as pas assez de matériaux.[/red]")
-        return
+    # Consommer matériaux
+    for mat, amt in inputs.items():
+        data["inventory"][mat] -= amt * amount
 
-    factories = data["machines"]["special"]["alloy_factory"]
-    machine = machines["alloy_factory"]
-    required_power = machine.power_required * factories
+    # Donner l'alliage
+    data["inventory"][choice] = data["inventory"].get(choice, 0) + (output_amount * amount)
 
-    if data["power"]["total_power"] < required_power:
-        rich_print("[red]❌ Pas assez d'énergie pour utiliser l'Alloy Factory.[/red]")
-        return
+    rich_print(f"[green]✔ {choice.capitalize()} créé avec succès ![/green]")
 
-    data["inventory"]["coal"] -= required_coal
-    data["inventory"]["iron"] -= required_iron
-    data["inventory"]["steel"] = data["inventory"].get("steel", 0) + amount
+    for mat, amt in inputs.items():
+        rich_print(f"[red]-{amt * amount} {mat}[/red]")
 
-    rich_print(f"[green]✔ Alloy créé avec succès ![/green]")
-    rich_print(f"[#202020]-{required_coal} Coal[/#202020]")
-    rich_print(f"[#D8D8D8]-{required_iron} Iron[/#D8D8D8]")
-    rich_print(f"[#C0C0C0]+{amount} Steel[/#C0C0C0]")
+    rich_print(f"[green]+{output_amount * amount} {choice}[/green]")
 
     save_game(data)
